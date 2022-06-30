@@ -1,0 +1,433 @@
+---
+title: 'R project: SLR and Bootstrap'
+author: "Lince Rumainum"
+date: "13 December 2020"
+output:
+  word_document:
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Introduction:
+What problem do you wish to solve with `myslr()`? -- 
+Function that creates estimates for the betas in a  slr.
+The function will take an x vector and a y vector.
+Scatter Plot shows the relation of y to x value and create fitted line 
+Histograms shows x and y data
+Output csv file shows comparison of predictions using built-in function and slr calculation results
+Commandline output shows input data, plots, and betas values from both built-in function and slr calculation
+
+# Data
+We will all apply our function to the mtcars data set and make a linear model `mpg ~ wt` - but remember the function will be completely general to SLR. 
+
+Describe the data
+
+Describe the nature and type of the variables.
+The mtcars data frame consist of 11 numeric variables with 32 data observations
+
+The variables are:
+[ 1]	mpg	 -- Miles/(US) gallon
+[ 2]	cyl	 -- Number of cylinders
+[ 3]	disp -- Displacement (cu.in.)
+[ 4]	hp	 -- Gross horsepower
+[ 5]	drat -- Rear axle ratio
+[ 6]	wt	 -- Weight (1000 lbs)
+[ 7]	qsec -- 1/4 mile time
+[ 8]	vs	 -- Engine (0 = V-shaped, 1 = straight)
+[ 9]	am	 -- Transmission (0 = automatic, 1 = manual)
+[10]	gear --	Number of forward gears
+[11]	carb --	Number of carburetors
+
+Plot the data
+First plot (default):
+It shows that the heavier the vehicle, the less efficient (mpg) it would be. It also shows the linear model from the observation points with its range of variance.
+Second plot:
+It shows the histograms of mpg data and separate them between engine type (0 = V-shaped, 1 = straight)
+It shows that V-shaped engine most likely to have lower mpg than straight engine
+Most of the V-shaped engine has approximately 15 mpg while the lowest mpg for straight engine is approximately 17.5 mpg
+
+```{r cars}
+data(mtcars) #load data
+head(mtcars) #look up first few rows of data 
+
+library(ggplot2) #load ggplot2
+#plot mtcars data mpg vs wt with cyl as fill
+#plot points and smooth (abline and variance shadowed) from data
+g = ggplot(mtcars, aes(x = wt, y=mpg, fill = cyl)) + geom_point() + geom_smooth(method="lm", formula=y~x)
+g
+
+#create histogram for mpg data 
+h = ggplot(mtcars, aes(x=mpg, fill=..density..))
+#create density on y
+h = h + geom_histogram(aes(y=..density..))
+#color red for high density and green for low density
+h = h + scale_fill_gradient("density", low="green", high="red")
+#have facet grid for the engine type
+#0 - V-shaped and 1 - straight
+h = h + facet_grid(vs~.)
+#create a dark theme background for the plots
+h = h + theme_dark()
+#plot
+h
+```
+
+# Theory used
+Give the mathematical formulae in Latex.
+Interpret the meaning of the symbols.
+
+$\hat{Y}_i$ = $\hat{\beta}_0$ + $\hat{\beta}_1 X_i$
+
+
+$\hat{Y}_i$ - the predicted variable; dependent of given value of x
+$\hat{\beta}_0$ - the y-intercept of the regression line
+$\hat{\beta}_1$ - the x-interval coefficient / slope
+
+Predictions of $\hat{\beta}_0$ and $\hat{\beta}_1$ can be calculated from the linear regression equation below:
+
+$\hat{\beta}_0$ = [ ($\sum$y)($\sum$x$^2$) - ($\sum$x)($\sum$xy) ] / [ n($\sum$x$^2$) - $(\sum$ x)$^2$ ]
+
+$\hat{\beta}_1$ = [ n($\sum$xy) - ($\sum$x)($\sum$y) ] / [ n($\sum$x$^2$) - $(\sum$ x)$^2$ ]
+
+# Application of SLR to the mtcars data set
+Use R to analysze the data
+`y.lm=lm(y~x,data=mtcars)`
+Check assumptions
+`normcheck()`
+`plot(y.lm, which =1)`
+
+Interpret the summary output.
+`summary(y.lm)`
+`ciReg(y.lm)`
+What are the point and interval estimates?
+From summary:
+The intercept point is 10.2779 with interval estimates of 4.9193
+The R-squared of this simple linear model:
+Multiple R-squared: 0.9235
+Adjusted R-squared: 0.9176 
+Since the R-squared value is close to 1, this linear model is considered to be a good model
+
+With Confidence Intervals For Regression Models results:
+              95 % C.I.lower    95 % C.I.upper
+(Intercept)        7.20960          13.34625
+x                  4.07085           5.76781
+
+# Now create functions:
+
+## Decide on the output you want
+
+### Plots
+  
+  1) Plot the data with the fitted line 
+  2) The plot can be made to appear when the function is used.
+  3) The plot is saved to the working directory automatically.
+
+### Files created
+
+Files created for x-value and two prediction values. One variable contain predictions from the betas results of the built-in linear model function and another variable contain predictions from the betas results of the betas calculation based on the linear regression equations 
+
+### Command line
+
+Shows the input x and y, beta estimates and R-squared values from summary and the Confidence Intervals
+
+# myslr
+
+```{r myslr}
+myslr = function(x,y,df)
+{
+  #load library
+  library(s20x)
+  library(ggplot2)
+  library(dplyr)
+  
+  #create the linear model with built-in function
+  y.lm = lm(y~x)
+  
+  #Create scatter plot of y vs x
+  s = ggplot(df, aes(x=x, y = y))
+  #plot points
+  s = s + geom_point() 
+  #plot linear model absolute line 
+  s = s + geom_smooth(method="lm", formula=y~x) 
+  #add title
+  s = s + ggtitle("Scatter Plot")
+  s = s + theme_gray()
+  #save scatter plot 
+  ggsave(path = getwd(), filename = "ScatterPlot.png",  dpi = 1000)
+  
+  #create histogram plot 
+  #histogram of x
+  #create histogram for x data 
+  hx = ggplot(df, aes(x=x, fill=..density..))
+  #create density on y-axis
+  hx = hx + geom_histogram(aes(y=..density..))
+  #color red for high density and green for low density
+  hx = hx + scale_fill_gradient("density", low="green", high="red")
+  #create a dark theme background for the plots
+  hx = hx + theme_dark()
+  #save x histogram 
+  ggsave(path = getwd(), filename = "x-Histogram.png",  dpi = 1000)
+  
+  #histogram of y
+  #create histogram for y data 
+  hy = ggplot(df, aes(x=y, fill=..density..))
+  #create density on y-axis
+  hy = hy + geom_histogram(aes(y=..density..))
+  #color red for high density and green for low density
+  hy = hy + scale_fill_gradient("density", low="green", high="red")
+  #create a black/white theme background for the plots
+  hy = hy + theme_bw()
+  #save y histogram
+  ggsave(path = getwd(), filename = "y-Histogram.png",  dpi = 1000)
+  
+  #get the confidence interval results 
+  #and summary of the linear model
+  ci.lm = ciReg(y.lm)
+  summary.lm = summary(y.lm)
+  
+  #Calculate estimation of betas from linear regression equation
+
+  #create variables
+  sum_y = sum(y)    #sum of y
+  sum_x2 = sum(x^2) #sum of x^2 
+  sum_x = sum(x)    #sum of x
+  sum_xy = sum(x*y) #sum of x*y
+  
+  n <- length(x) # get number of data
+  
+  #Calculate b0 (y-Intercept) and b1 (x-coefficient)
+  b0 <- (sum_y*sum_x2 - sum_x*sum_xy) / (n*sum_x2 - (sum_x^2))
+  b1 <- (n*sum_xy - sum_x * sum_y) / (n*sum_x2 - (sum_x^2))
+  
+  #create x_list with increment of 0.1 
+  x_list <- as.data.frame(seq(min(x)-1,max(x)+1,0.1))
+  
+  #create y_prediction from betas results of built-in function
+  y_pred <- as.data.frame(y.lm$coef[1] + y.lm$coef[2] * x_list)
+  
+  #create y_prediction from betas results of equation
+  y_pred_calc <- as.data.frame(b0 + b1 * x_list)
+  
+  #unlist data and convert as numeric
+  x_points <- as.numeric(unlist(x_list))
+  y_built_in_func <- as.numeric(unlist(y_pred))
+  y_calculation <- as.numeric(unlist(y_pred_calc))
+  
+  #create results data with x and  
+  #two y's values (one betas from built-in lm and one betas from calculation)
+  result_data <- tibble(x=x_points,y_lm=y_built_in_func,y_calc=y_calculation)
+  
+  path <- getwd()
+  resultFile <- paste(path, "\\results.csv", sep = "")
+  write.csv(result_data, resultFile, row.names = F)
+  
+  #command line list of:
+  #the x and y inputs 
+  #the beta estimates from :
+  #the confidence interval and the summary of the linear model
+  list(x=x, y=y,
+       scatterPlot = s, 
+       histogram_x = hx, 
+       histogram_y = hy, 
+       confindence_interval=ci.lm, 
+       summary=summary.lm,
+       yIntercept_from_calculation = b0,
+       xCoefficient_from_calculation = b1)
+}
+
+```
+
+# Now invoke your functiion
+
+```{r invokeslr, eval=TRUE}
+#load library
+library(s20x)
+library(dplyr)
+#get x-data
+x_dat = mtcars$wt
+#get y-data
+y_dat = mtcars$mpg
+#create object for myslr function
+obj1 = myslr(x=x_dat,y=y_dat,df=mtcars)
+#view object data
+obj1
+
+```
+
+
+# Bootstrap 
+
+Make a function `myboot` that will create  bootstrap estimates from a sample.
+The parameter estimated will be the population variance $\sigma^2$ of mpg for 4 cylinder cars. Though the function will be entirely general.
+
+# Make the function
+
+x is a sample vector alpha is the error rate, the `100(1-alpha)%`  confidence interval is `quantile(stat, c(alpha/2,1-alpha/2))`
+
+## Plots 
+histogram of the simulated statistic.
+What statistic will you use to estimate $\sigma^2$
+
+## Commandline
+
+list of interesting objects like $\hat{\sigma^2}$
+
+## File
+
+write a file to the commandline that contains the simulation.
+
+```{r myboot}
+myboot = function(x, alpha)
+{
+  #load library
+  library(s20x)
+  library(dplyr)
+  library(gridExtra)
+  
+  #get number of population
+  n <- nrow(x)
+  
+  #initialize sample size, 100 x bigger than population since replacement is possible
+  sample_size = n * 100
+  #unlist x data
+  x_vector = unlist(x)
+  #create sample with replacement
+  smple = sample(x_vector, sample_size, replace = TRUE)
+  
+  #create histogram of the density of population and sample
+  
+  #POPULATION
+  #create data frame for input to be able to be plotted
+  df_pop = as.data.frame(x)
+  x_pop = unlist(df_pop[1])
+  #create histogram with ggplot
+  hd_pop = ggplot(df_pop, aes(x=x_pop, fill=..density..))
+  #h_pop = ggplot(df_pop, aes(x=x_pop))
+  #use the frequency on y-axis
+  hd_pop = hd_pop + geom_histogram(aes(y=..density..))
+  #h_pop = h_pop + geom_histogram(frequency=TRUE)
+  #color red for high density and black for low density
+  hd_pop = hd_pop + scale_fill_gradient("density", low="black", high="red")
+  #create a gray theme background for the plots
+  hd_pop = hd_pop + theme_gray()
+  #plot
+  hd_pop
+  #save population's histogram
+  ggsave(path = getwd(), filename = "pop-density-Histogram.png",  dpi = 1000)
+  
+  #SAMPLE
+  #create sample data frame
+  df_sample = as.data.frame(smple)
+  #create x-samplefor histogram plot
+  x_sample=unlist(df_sample[1])
+  
+  #create histogram with ggplot
+  hd_sample = ggplot(df_sample, aes(x=x_sample, fill=..density..))
+  #h_sample = ggplot(df_sample, aes(x=x_sample))
+  #use the frequency on y-axis
+  hd_sample = hd_sample + geom_histogram(aes(y=..density..))
+  #h_sample = h_sample + geom_histogram(frequency=TRUE)
+  #color red for high density and black for low density
+  hd_sample = hd_sample + scale_fill_gradient("density", low="black", high="red")
+  #create a gray theme background for the plots
+  hd_sample = hd_sample + theme_dark()
+  #plot
+  hd_sample
+  #save sample's histogram
+  ggsave(path = getwd(), filename = "sample-density-Histogram.png",  dpi = 1000)
+  
+  #COMPARE HISTOGRAMS
+  #create grid to put histogram of population and sample side-by-side
+  hd_pop_sample = grid.arrange(hd_pop, hd_sample, ncol=2)
+  #save stat's histogram
+  ggsave(path = getwd(), filename = "pop-sample-density-Histogram.png", hd_pop_sample,  dpi = 1000)
+  
+  #create histogram of the frequency of population and sample
+  
+  #POPULATION
+  #create histogram with ggplot
+  hf_pop = ggplot(df_pop, aes(x=x_pop))
+  #use the frequency on y-axis
+  hf_pop = hf_pop + geom_histogram(frequency=TRUE)
+  #create a gray theme background for the plots
+  hf_pop = hf_pop + theme_gray()
+  #plot
+  hf_pop
+  #save population's histogram
+  ggsave(path = getwd(), filename = "pop-freq-Histogram.png",  dpi = 1000)
+  
+  #SAMPLE
+  #create histogram with ggplot
+  hf_sample = ggplot(df_sample, aes(x=x_sample))
+  #use the frequency on y-axis
+  hf_sample = hf_sample + geom_histogram(frequency=TRUE)
+  #create a dark theme background for the plot
+  hf_sample = hf_sample + theme_dark()
+  #plot
+  hf_sample
+  #save stat's histogram
+  ggsave(path = getwd(), filename = "sample-freq-Histogram.png",  dpi = 1000)
+  
+  #create grid to put histogram of population and sample side-by-side
+  hf_pop_sample = grid.arrange(hf_pop, hf_sample, ncol=2)
+  #save stat's histogram
+  ggsave(path = getwd(), filename = "pop-sample-frequency-Histogram.png", hf_pop_sample,  dpi = 1000)
+  
+  #Calcuate statistics data below:
+  
+  #create object quantile result for the specified confidence interval
+  quantile_result <- quantile(data.matrix(x_sample),c(alpha/2,1-alpha/2))
+  
+  #unlist x and convert as numeric for population variance calculation
+  x_num = as.numeric(unlist(x[1]))
+  #calculate population variance
+  #using the population variance formula 
+  pop_mean = mean(x_num)
+  pop_var <- (sum((x_num-pop_mean)^2))/n
+  #calculate sample variance
+  #using the sample variance formula 
+  #(same result as using var function from stat package --> var(x_stat))
+  sample_mean = mean(x_sample)
+  sample_var <- (sum((x_sample-sample_mean)^2))/(sample_size-1)
+  
+  #command line list of:
+  #input data / population data
+  #histogram of the density of population and sample data
+  #sample variance of the sample data
+  #population variance of the input data
+  #histogram of the frequency of population and sample data
+  #quantile result with specified confidence interval 
+  list(input_data = x, 
+       histogram_density_population_and_sample = hd_pop_sample,
+       population_variance = pop_var, sample_variance = sample_var,
+       histogram_frequency_population_and_sample = hf_pop_sample, 
+       quantile = quantile_result)
+}
+
+```
+
+# Invoke your function for the mtcars dataset
+
+Must get x by using `subset()` or something else
+
+```{r, eval=TRUE}
+#load library
+library(s20x)
+library(dplyr)
+#create a subset for mtcars's mpg data for 4 cylinders vehicles
+sample_mpg_4cyl = mtcars %>% filter(cyl == 4) %>% select(mpg)
+#create object using myboot function
+obj = myboot(x= sample_mpg_4cyl, alpha = 0.05)
+#view object's data
+obj
+```
+
+# Make a <5 min recording of both functions running on the data sets with your explanation
+
+You can use quicktime .mov for a mac or use BBFLASH free edition for PC -- make as a small file (keep as .fbr)
+
+[https://www.flashbackrecorder.com/express/download/](https://www.flashbackrecorder.com/express/download/)
